@@ -18,6 +18,16 @@ issues:
         - gocyclo
         - gosec
 
+depguard:
+  rules:
+    main:
+      list-mode: lax
+      files:
+      - $all
+      - "!$test"
+      allow:
+      - $gostd
+
 linters:
   disable-all: true
   enable:
