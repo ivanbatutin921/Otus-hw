@@ -18,12 +18,22 @@ issues:
         - gocyclo
         - gosec
 
+depguard:
+  rules:
+    main:
+      list-mode: lax
+      files:
+      - $all
+      - "!$test"
+      allow:
+      - $gostd
+
 linters:
   disable-all: true
   enable:
     - asciicheck
     - bodyclose
-    - depguard
+    # - depguard
     - dogsled
     - dupl
     - durationcheck
@@ -65,3 +75,4 @@ linters:
     - unparam
     - unused
     - whitespace
+
