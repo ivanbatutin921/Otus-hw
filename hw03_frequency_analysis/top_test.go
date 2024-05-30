@@ -80,3 +80,45 @@ func TestTop10(t *testing.T) {
 		}
 	})
 }
+
+func TestSplitText(t *testing.T) {
+	text := `This is a test`
+	expected := []string{"This", "is", "a", "test"}
+	require.Equal(t, expected, SplitText(text))
+}
+
+func TestCountWordFrequency(t *testing.T) {
+	words := []string{"This", "is", "a", "test", "This", "is", "a", "test", "This", "is", "a", "test"}
+	expected := map[string]int{"This": 3, "is": 3, "a": 3, "test": 3}
+	require.Equal(t, expected, CountWordFrequency(words))
+}
+
+func TestSortWordFrequencies(t *testing.T) {
+	frequencies := []wordFrequency{
+		{"test", 3},
+		{"is", 3},
+		{"a", 3},
+		{"This", 3},
+	}
+	expected := []wordFrequency{
+		{"This", 3},
+		{"a", 3},
+		{"is", 3},
+		{"test", 3},
+	}
+	SortWordFrequencies(frequencies)
+	require.Equal(t, expected, frequencies)
+}
+
+func TestGetTopTenWords(t *testing.T) {
+	frequencies := []wordFrequency{
+		{"test", 3},
+		{"is", 3},
+		{"a", 3},
+		{"This", 3},
+		{"word", 2},
+		{"another", 1},
+	}
+	expected := []string{"This", "a", "is", "test", "word", "another"}
+	require.Equal(t, expected, GetTopTenWords(frequencies))
+}
