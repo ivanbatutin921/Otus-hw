@@ -32,7 +32,6 @@ func SortWordFrequencies(frequencies []wordFrequency) {
 }
 
 func GetTopTenWords(frequencies []wordFrequency) []string {
-	// Sort the frequencies slice based on frequency in descending order
 	sort.Slice(frequencies, func(i, j int) bool {
 		if frequencies[i].count == frequencies[j].count {
 			return frequencies[i].word < frequencies[j].word
