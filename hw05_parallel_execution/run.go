@@ -10,21 +10,41 @@ var ErrErrorsLimitExceeded = errors.New("errors limit exceeded")
 type Task func() error
 
 func Run(tasks []Task, n, m int) error {
-	if m <= 0 {
-		return ErrErrorsLimitExceeded
-	}
-
 	taskCh := make(chan Task)
-	resultCh := make(chan error)
-	errCh := make(chan struct{})
-
+	errorCh := make(chan error)
+	var errorCount int
 	var wg sync.WaitGroup
-	wg.Add(n)
 
+	// запускаем n горутин для выполнения задач
 	for i := 0; i < n; i++ {
-		go worker(taskCh, resultCh, &wg)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for task := range taskCh {
+				err := task()
+				if err!= nil {
+					errorCh <- err
+					return
+				}
+			}
+		}()
 	}
 
+	// запускаем горутину для принятия ошибок и подсчета их количества
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for err := range errorCh {
+			_ = err
+			errorCount++
+			if errorCount >= m {
+				close(errorCh)
+				close(taskCh)
+			}
+		}
+	}()
+
+	// отправляем задачи в канал
 	go func() {
 		for _, task := range tasks {
 			taskCh <- task
@@ -32,40 +52,11 @@ func Run(tasks []Task, n, m int) error {
 		close(taskCh)
 	}()
 
-	go func() {
-		errCount := 0
-		for err := range resultCh {
-			if err!= nil {
-				errCount++
-				if errCount >= m {
-					errCh <- struct{}{}
-					return
-				}
-			}
-		}
-		wg.Done()
-	}()
+	wg.Wait()
 
-	select {
-	case <-errCh:
+	if errorCount >= m {
 		return ErrErrorsLimitExceeded
-	case <-wait(&wg):
-		return nil
 	}
-}
 
-func worker(taskCh <-chan Task, resultCh chan<- error, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for task := range taskCh {
-		resultCh <- task()
-	}
-}
-
-func wait(wg *sync.WaitGroup) <-chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(ch)
-	}()
-	return ch
+	return nil
 }
