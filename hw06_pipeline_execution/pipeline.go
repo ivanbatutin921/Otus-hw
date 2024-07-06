@@ -14,6 +14,11 @@ func ExecutePipeline(in In, done In, stages ...Stage) Out {
 	go func() {
 		defer close(out)
 
+		// go func() {
+		// 	<-done
+		// 	close(out) 
+		// }()
+
 		OutChan := in
 
 		for _, stage := range stages {
