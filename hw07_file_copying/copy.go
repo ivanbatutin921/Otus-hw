@@ -32,7 +32,12 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 	}
 
 	if offset > fromFileInfo.Size() {
-		return ErrOffsetExceedsFileSize
+		bytesToCopy = 0
+	} else {
+		bytesToCopy = fromFileInfo.Size() - offset
+		if limit > 0 && limit < bytesToCopy {
+			bytesToCopy = limit
+		}
 	}
 
 	toFile, err := os.Create(toPath)
