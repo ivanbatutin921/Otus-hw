@@ -32,12 +32,7 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 	}
 
 	if offset > fromFileInfo.Size() {
-		bytesToCopy = 0
-	} else {
-		bytesToCopy = fromFileInfo.Size() - offset
-		if limit > 0 && limit < bytesToCopy {
-			bytesToCopy = limit
-		}
+		return ErrOffsetExceedsFileSize
 	}
 
 	toFile, err := os.Create(toPath)
@@ -56,7 +51,12 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 
 	_, err = io.CopyN(toFile, io.NewSectionReader(fromFile, offset, bytesToCopy), bytesToCopy)
 	if err != nil {
-		return err
+		if err == io.EOF {
+			// EOF is expected when we reach the end of the file
+			err = nil
+		} else {
+			return err
+		}
 	}
 
 	bar.Finish()
