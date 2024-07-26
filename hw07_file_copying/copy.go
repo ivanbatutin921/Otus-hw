@@ -51,7 +51,9 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 
 	_, err = io.CopyN(toFile, io.NewSectionReader(fromFile, offset, bytesToCopy), bytesToCopy)
 	if err != nil {
-		return err
+		if !errors.Is(err, io.EOF) {
+			return err
+		}
 	}
 
 	bar.Finish()
