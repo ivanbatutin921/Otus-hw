@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+cc#!/usr/bin/env bash
 set -xeuo pipefail
 
 go build -o go-envdir
