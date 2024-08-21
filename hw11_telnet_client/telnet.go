@@ -43,16 +43,24 @@ func (t *telnetClient) Send() error {
 	if t.conn == nil {
 		return errConnection
 	}
+	defer t.conn.Close() // close the connection when done
 	_, err := io.Copy(t.conn, t.in)
-	return err
+	if err != nil && err != io.EOF {
+		return err
+	}
+	return nil
 }
 
 func (t *telnetClient) Receive() error {
 	if t.conn == nil {
 		return errConnection
 	}
+	defer t.conn.Close() // close the connection when done
 	_, err := io.Copy(t.out, t.conn)
-	return err
+	if err != nil && err != io.EOF {
+		return err
+	}
+	return nil
 }
 
 func (t *telnetClient) Close() error {
