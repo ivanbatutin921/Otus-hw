@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -45,7 +46,10 @@ func (t *telnetClient) Send() error {
 	}
 	defer t.conn.Close() // close the connection when done
 	_, err := io.Copy(t.conn, t.in)
-	if err != nil && err != io.EOF {
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
 		return err
 	}
 	return nil
@@ -57,7 +61,10 @@ func (t *telnetClient) Receive() error {
 	}
 	defer t.conn.Close() // close the connection when done
 	_, err := io.Copy(t.out, t.conn)
-	if err != nil && err != io.EOF {
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
 		return err
 	}
 	return nil
