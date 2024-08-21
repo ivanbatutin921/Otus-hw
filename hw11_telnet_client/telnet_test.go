@@ -63,3 +63,24 @@ func TestTelnetClient(t *testing.T) {
 		wg.Wait()
 	})
 }
+
+
+func TestNoConnection(t *testing.T) {
+	address := net.JoinHostPort("127.0.0.1", "1234")
+	client := NewTelnetClient(address, time.Second*2, nil, nil)
+
+	t.Run("send", func(t *testing.T) {
+		err := client.Send()
+		require.ErrorIs(t, err, errConnection)
+	})
+
+	t.Run("receive", func(t *testing.T) {
+		err := client.Receive()
+		require.ErrorIs(t, err, errConnection)
+	})
+
+	t.Run("close", func(t *testing.T) {
+		err := client.Close()
+		require.NoError(t, err)
+	})
+}
