@@ -64,7 +64,6 @@ func TestTelnetClient(t *testing.T) {
 	})
 }
 
-
 func TestNoConnection(t *testing.T) {
 	address := net.JoinHostPort("127.0.0.1", "1234")
 	client := NewTelnetClient(address, time.Second*2, nil, nil)
