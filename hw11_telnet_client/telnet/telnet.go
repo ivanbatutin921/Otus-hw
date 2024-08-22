@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-type TelnetSimpleClient struct {
+type SimpleClient struct {
 	Address string
 	Timeout time.Duration
 	in      io.ReadCloser
@@ -14,8 +14,8 @@ type TelnetSimpleClient struct {
 	conn    net.Conn
 }
 
-func NewSimpleTelnetClient(address string, timeout time.Duration, in io.ReadCloser, out io.Writer) *TelnetSimpleClient {
-	return &TelnetSimpleClient{
+func NewSimpleTelnetClient(address string, timeout time.Duration, in io.ReadCloser, out io.Writer) *SimpleClient {
+	return &SimpleClient{
 		in:      in,
 		out:     out,
 		Address: address,
@@ -23,13 +23,13 @@ func NewSimpleTelnetClient(address string, timeout time.Duration, in io.ReadClos
 	}
 }
 
-func (c *TelnetSimpleClient) Connect() error {
+func (c *SimpleClient) Connect() error {
 	conn, err := net.DialTimeout("tcp", c.Address, c.Timeout)
 	c.conn = conn
 	return err
 }
 
-func (c *TelnetSimpleClient) Send() error {
+func (c *SimpleClient) Send() error {
 	if c.conn == nil {
 		return ErrConnection
 	}
@@ -37,7 +37,7 @@ func (c *TelnetSimpleClient) Send() error {
 	return err
 }
 
-func (c *TelnetSimpleClient) Receive() error {
+func (c *SimpleClient) Receive() error {
 	if c.conn == nil {
 		return ErrConnection
 	}
@@ -45,7 +45,7 @@ func (c *TelnetSimpleClient) Receive() error {
 	return err
 }
 
-func (c *TelnetSimpleClient) Close() error {
+func (c *SimpleClient) Close() error {
 	if c.conn != nil {
 		err := c.conn.Close()
 		c.conn = nil

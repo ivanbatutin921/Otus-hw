@@ -44,7 +44,7 @@ func main() {
 		fatal(err)
 	}
 
-	defer func(client telnet.TelnetClientInterface) {
+	defer func(client telnet.ClientInterface) {
 		if err := client.Close(); err != nil {
 			fatal(err)
 		}

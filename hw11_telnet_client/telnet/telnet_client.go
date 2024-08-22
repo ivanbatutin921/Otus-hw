@@ -7,7 +7,7 @@ import (
 
 var ErrConnection = errors.New("connection error")
 
-type TelnetClientInterface interface {
+type ClientInterface interface {
 	Connect() error
 	io.Closer
 	Send() error
