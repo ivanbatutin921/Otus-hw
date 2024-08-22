@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ivanbatutin921/Otus-hw/hw11_telnet_client/telnet"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,7 +30,7 @@ func TestTelnetClient(t *testing.T) {
 			timeout, err := time.ParseDuration("10s")
 			require.NoError(t, err)
 
-			client := NewTelnetClient(l.Addr().String(), timeout, io.NopCloser(in), out)
+			client := telnet.NewSimpleTelnetClient(l.Addr().String(), timeout, io.NopCloser(in), out)
 			require.NoError(t, client.Connect())
 			defer func() { require.NoError(t, client.Close()) }()
 
@@ -66,16 +67,16 @@ func TestTelnetClient(t *testing.T) {
 
 func TestNoConnection(t *testing.T) {
 	address := net.JoinHostPort("127.0.0.1", "1234")
-	client := NewTelnetClient(address, time.Second*2, nil, nil)
+	client := telnet.NewSimpleTelnetClient(address, time.Second*2, nil, nil)
 
 	t.Run("send", func(t *testing.T) {
 		err := client.Send()
-		require.ErrorIs(t, err, errConnection)
+		require.ErrorIs(t, err, telnet.ErrConnection)
 	})
 
 	t.Run("receive", func(t *testing.T) {
 		err := client.Receive()
-		require.ErrorIs(t, err, errConnection)
+		require.ErrorIs(t, err, telnet.ErrConnection)
 	})
 
 	t.Run("close", func(t *testing.T) {

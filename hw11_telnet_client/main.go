@@ -10,6 +10,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/ivanbatutin921/Otus-hw/hw11_telnet_client/telnet" //nolint:depguard
 )
 
 var timeout time.Duration
@@ -36,13 +38,13 @@ func main() {
 	}
 
 	address := net.JoinHostPort(args[0], args[1])
-	client := NewTelnetClient(address, timeout, os.Stdin, os.Stdout)
+	client := telnet.NewSimpleTelnetClient(address, timeout, os.Stdin, os.Stdout)
 
 	if err := client.Connect(); err != nil {
 		fatal(err)
 	}
 
-	defer func(client TelnetClient) {
+	defer func(client telnet.TelnetClientInterface) {
 		if err := client.Close(); err != nil {
 			fatal(err)
 		}
