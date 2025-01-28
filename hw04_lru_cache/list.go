@@ -22,6 +22,7 @@ type list struct {
 	len   int
 }
 
+
 func NewList() List {
 	return new(list)
 }
