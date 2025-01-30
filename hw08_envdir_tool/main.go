@@ -1,22 +1,19 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 )
 
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println("Usage: go-envdir <dir> <command> [args...]")
-		return
-	}
-	dir := os.Args[1]
-	cmd := os.Args[2:]
-	env, err := ReadDir(dir)
+	cmdArgs := os.Args
+	dirPath := cmdArgs[1]
+
+	env, err := ReadDir(dirPath)
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
-	returnCode := RunCmd(cmd, env)
-	os.Exit(returnCode)
+
+	resultCode := RunCmd(cmdArgs, env)
+	os.Exit(resultCode)
 }

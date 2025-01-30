@@ -1,37 +1,38 @@
 package main
 
 import (
+	"errors"
+	"log"
 	"os"
 	"os/exec"
-	"strings"
 )
 
 // RunCmd runs a command + arguments (cmd) with environment variables from env.
 func RunCmd(cmd []string, env Environment) (returnCode int) {
-	command := exec.Command(cmd[0], cmd[1:]...)
-	command.Env = os.Environ()
-	for key, value := range env {
+	for envName, value := range env {
 		if value.NeedRemove {
-			command.Env = removeEnv(command.Env, key)
-		} else {
-			command.Env = append(command.Env, key+"="+value.Value)
+			if err := os.Unsetenv(envName); err != nil {
+				log.Fatal(err)
+			}
+		}
+		if err := os.Setenv(envName, value.Value); err != nil {
+			log.Fatal(err)
 		}
 	}
-	command.Stdin = os.Stdin
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	err := command.Run()
-	if err != nil {
-		returnCode = 1
-	}
-	return
-}
 
-func removeEnv(env []string, key string) []string {
-	for i, v := range env {
-		if strings.HasPrefix(v, key+"=") {
-			return append(env[:i], env[i+1:]...)
+	command := exec.Command(cmd[2], cmd[3], cmd[4], cmd[5]) //nolint:gosec
+
+	command.Stdout = os.Stdout
+	command.Stdin = os.Stdin
+	command.Stderr = os.Stderr
+
+	if err := command.Run(); err != nil {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			return exitError.ExitCode()
 		}
+		defaultErrCode := 100
+		return defaultErrCode
 	}
-	return env
+	return 0
 }
