@@ -4,8 +4,26 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
+)
+
+var (
+	ErrUnsupportedInputType = errors.New("unsupported input type")
+	ErrInvalidTagSyntax     = fmt.Errorf("tag must contain %q", tagDefinder)
+)
+
+type UnsupportedTagRuleError struct {
+	rule string
+}
+
+func (err UnsupportedTagRuleError) Error() string {
+	return fmt.Sprintf("tag rule %q isn't supported", err.rule)
+}
+
+const (
+	validationTag string = "validate"
+	tagDivider    string = "|"
+	tagDefinder   string = ":"
 )
 
 type ValidationError struct {
@@ -16,101 +34,157 @@ type ValidationError struct {
 type ValidationErrors []ValidationError
 
 func (v ValidationErrors) Error() string {
-	sb := new(strings.Builder)
-	for _, e := range v {
-		sb.WriteString(e.Field + ": " + e.Err.Error() + "\n")
+	var result strings.Builder
+	result.WriteString("errors while validation:\n")
+	for _, err := range v {
+		result.WriteString(fmt.Sprintf("%v\t%v\n", err.Field, err.Err))
 	}
-	return sb.String()
+	return result.String()
 }
 
 func Validate(v interface{}) error {
-	// Шаг 1: Получаем тип и значение структуры
-	value := reflect.ValueOf(v)
-	if value.Kind() != reflect.Ptr {
-		value = value.Elem()
-	}
-	if value.Kind() != reflect.Struct {
-		return errors.New("not a struct")
+	vValue := reflect.ValueOf(v)
+	vType := vValue.Type()
+
+	if vValue.Kind() != reflect.Struct {
+		return ErrUnsupportedInputType
 	}
 
-	var validationErrors ValidationErrors
+	validator, err := ParseRules(vType)
+	if err != nil {
+		return err
+	}
 
-	// Шаг 2: Проходим по всем полям структуры
-	t := value.Type()
-	for i := 0; i < value.NumField(); i++ {
-		field := t.Field(i)
-		fieldValue := value.Field(i)
+	return validator.Validate(vValue)
+}
 
-		// Шаг 3: Считываем тег validate
-		validateTag := field.Tag.Get("validate")
-		if validateTag == "" {
+type Validator struct {
+	errors           ValidationErrors
+	structValidators map[string]Validator
+	intRules         map[string][]IntRule
+	stringRules      map[string][]StringRule
+	isSlice          map[string]bool
+}
+
+func ParseRules(t reflect.Type) (Validator, error) {
+	validator := Validator{
+		make(ValidationErrors, 0),
+		make(map[string]Validator, 0),
+		make(map[string][]IntRule, 0),
+		make(map[string][]StringRule, 0),
+		make(map[string]bool, 0),
+	}
+	var err error
+
+	for _, field := range reflect.VisibleFields(t) {
+		fieldTag, found := field.Tag.Lookup(validationTag)
+
+		kind := field.Type.Kind()
+		validator.isSlice[field.Name] = false
+		if kind == reflect.Slice {
+			kind = field.Type.Elem().Kind()
+			validator.isSlice[field.Name] = true
+		}
+
+		if !found && kind != reflect.Struct {
 			continue
 		}
 
-		// Шаг 4: Распарсим тэг и выполним проверки
-		rules := strings.Split(validateTag, ",") // Разделяем по запятой
-		for _, rule := range rules {
-			// Вызываем проверку для каждого правила
-			err := applyRule(field.Name, fieldValue, rule)
-			if err != nil {
-				validationErrors = append(validationErrors, ValidationError{
-					Field: field.Name,
-					Err:   err,
-				})
+		switch kind { //nolint
+		case reflect.Struct:
+			if validator.isSlice[field.Name] {
+				validator.structValidators[field.Name], err = ParseRules(field.Type.Elem())
+			} else {
+				validator.structValidators[field.Name], err = ParseRules(field.Type)
 			}
+		case reflect.Int:
+			validator.intRules[field.Name], err = ParseIntRules(fieldTag)
+		case reflect.String:
+			validator.stringRules[field.Name], err = ParseStringRules(fieldTag)
+		default:
+			return validator, fmt.Errorf("unsupported type %q", kind)
+		}
+		if err != nil {
+			return validator, fmt.Errorf("field %q has invalid tag %w", field.Name, err)
 		}
 	}
-	if len(validationErrors) > 0 {
-		return validationErrors
-	}
-
-	return nil
+	return validator, nil
 }
 
-func applyRule(fieldName string, fieldValue reflect.Value, rule string) error {
-	parts := strings.Split(rule, ":")
-	switch parts[0] {
-	case "min":
-		minValue, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return fmt.Errorf("invalid min rule: %w", err)
-		}
-		if fieldValue.Kind() == reflect.Int {
-			if fieldValue.Int() < int64(minValue) {
-				return fmt.Errorf("field %q must be at least %d", fieldName, minValue)
+func (v *Validator) Validate(value reflect.Value) error {
+	v.errors = make(ValidationErrors, 0)
+	v.validateStructFields(value)
+	v.validateIntFields(value)
+	v.validateStringFields(value)
+	return v.errors
+}
+
+func (v *Validator) validateStructFields(value reflect.Value) {
+	for fieldName, validator := range v.structValidators {
+		field := value.FieldByName(fieldName)
+		if v.isSlice[fieldName] {
+			for elemIndex := 0; elemIndex < field.Len(); elemIndex++ {
+				v.checkStructField(fieldName, field.Index(elemIndex), validator)
 			}
-		} else if fieldValue.Kind() == reflect.String {
-			if fieldValue.Len() < minValue {
-				return fmt.Errorf("field %q must be at least %d characters long", fieldName, minValue)
-			}
-		}
-	case "max":
-		maxValue, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return fmt.Errorf("invalid max rule: %w", err)
-		}
-		if fieldValue.Kind() == reflect.Int {
-			if fieldValue.Int() > int64(maxValue) {
-				return fmt.Errorf("field %q must be at most %d", fieldName, maxValue)
-			}
-		} else if fieldValue.Kind() == reflect.String {
-			if fieldValue.Len() > maxValue {
-				return fmt.Errorf("field %q must be at most %d characters long", fieldName, maxValue)
-			}
-		}
-	case "in":
-		options := strings.Split(parts[1], ",")
-		valid := false
-		for _, option := range options {
-			if fieldValue.String() == option {
-				valid = true
-				break
-			}
-		}
-		if !valid {
-			return fmt.Errorf("field %q must be one of [%s]", fieldName, strings.Join(options, ","))
+		} else {
+			v.checkStructField(fieldName, field, validator)
 		}
 	}
-	
-	return nil
+}
+
+func (v *Validator) validateIntFields(value reflect.Value) {
+	for fieldName, rule := range v.intRules {
+		field := value.FieldByName(fieldName)
+		if v.isSlice[fieldName] {
+			for elemIndex := 0; elemIndex < field.Len(); elemIndex++ {
+				v.checkIntField(fieldName, field.Index(elemIndex), rule)
+			}
+		} else {
+			v.checkIntField(fieldName, field, rule)
+		}
+	}
+}
+
+func (v *Validator) validateStringFields(value reflect.Value) {
+	for fieldName, rule := range v.stringRules {
+		field := value.FieldByName(fieldName)
+		if v.isSlice[fieldName] {
+			for elemIndex := 0; elemIndex < field.Len(); elemIndex++ {
+				v.checkStringField(fieldName, field.Index(elemIndex), rule)
+			}
+		} else {
+			v.checkStringField(fieldName, field, rule)
+		}
+	}
+}
+
+func (v *Validator) checkStructField(fieldName string, field reflect.Value, validator Validator) {
+	err := validator.Validate(field).(ValidationErrors) //nolint
+	if len(err) > 0 {
+		v.errors = append(v.errors, ValidationError{fieldName, err})
+	}
+}
+
+func (v *Validator) checkIntField(fieldName string, field reflect.Value, rules []IntRule) {
+	if !field.CanInt() {
+		v.errors = append(v.errors, ValidationError{fieldName, fmt.Errorf("wrong type %T", field.Kind())})
+		return
+	}
+	value := field.Int()
+	for _, rule := range rules {
+		err := rule(value)
+		if err != nil {
+			v.errors = append(v.errors, ValidationError{fieldName, err})
+		}
+	}
+}
+
+func (v *Validator) checkStringField(fieldName string, field reflect.Value, rules []StringRule) {
+	value := field.String()
+	for _, rule := range rules {
+		err := rule(value)
+		if err != nil {
+			v.errors = append(v.errors, ValidationError{fieldName, err})
+		}
+	}
 }
